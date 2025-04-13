@@ -8,7 +8,8 @@ const TimestampSchema = {
     match: [
         /^(((2000|2400|2800|(19|2[0-9](0[48]|[2468][048]|[13579][26])))-02-29)|(((19|2[0-9])[0-9]{2})-02-(0[1-9]|1[0-9]|2[0-8]))|(((19|2[0-9])[0-9]{2})-(0[13578]|10|12)-(0[1-9]|[12][0-9]|3[01]))|(((19|2[0-9])[0-9]{2})-(0[469]|11)-(0[1-9]|[12][0-9]|30)))T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})?$/,
         'Format de date/heure invalide. Utilisez ISO 8601/RFC3339'
-    ]
+    ],
+    default: new Date().toISOString() // Valeur par défaut: date actuelle
 };
 
 const UuidSchema = {
@@ -16,7 +17,8 @@ const UuidSchema = {
     match: [
         /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-4[0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$/,
         'Format UUID v4 invalide'
-    ]
+    ],
+    default: '00000000-0000-4000-a000-000000000000' // UUID par défaut
 };
 
 const LanguageSchema = {
@@ -34,7 +36,8 @@ const UriSchema = {
         /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i,
         'URI invalide'
     ],
-    maxlength: 2048
+    maxlength: 2048,
+    default: 'https://example.com'
 };
 
 // Schéma pour les médias supportant les descriptions
@@ -42,7 +45,8 @@ const SupportingMediaSchema = new Schema({
     type: {
         type: String,
         required: true,
-        maxlength: 256
+        maxlength: 256,
+        default: 'text/plain'
     },
     base64: {
         type: Boolean,
@@ -51,7 +55,8 @@ const SupportingMediaSchema = new Schema({
     value: {
         type: String,
         required: true,
-        maxlength: 16384
+        maxlength: 16384,
+        default: ''
     }
 }, {_id: false});
 
@@ -61,9 +66,13 @@ const DescriptionSchema = new Schema({
     value: {
         type: String,
         required: true,
-        maxlength: 4096
+        maxlength: 4096,
+        default: 'Description non disponible'
     },
-    supportingMedia: [SupportingMediaSchema]
+    supportingMedia: {
+        type: [SupportingMediaSchema],
+        default: []
+    }
 }, {_id: false});
 
 // Schéma pour les références
@@ -71,32 +80,36 @@ const ReferenceSchema = new Schema({
     url: UriSchema,
     name: {
         type: String,
-        maxlength: 512
+        maxlength: 512,
+        default: 'Référence'
     },
-    tags: [{
-        type: String,
-        enum: [
-            'broken-link',
-            'customer-entitlement',
-            'exploit',
-            'government-resource',
-            'issue-tracking',
-            'mailing-list',
-            'mitigation',
-            'not-applicable',
-            'patch',
-            'permissions-required',
-            'media-coverage',
-            'product',
-            'related',
-            'release-notes',
-            'signature',
-            'technical-description',
-            'third-party-advisory',
-            'vendor-advisory',
-            'vdb-entry'
-        ]
-    }]
+    tags: {
+        type: [{
+            type: String,
+            enum: [
+                'broken-link',
+                'customer-entitlement',
+                'exploit',
+                'government-resource',
+                'issue-tracking',
+                'mailing-list',
+                'mitigation',
+                'not-applicable',
+                'patch',
+                'permissions-required',
+                'media-coverage',
+                'product',
+                'related',
+                'release-notes',
+                'signature',
+                'technical-description',
+                'third-party-advisory',
+                'vendor-advisory',
+                'vdb-entry'
+            ]
+        }],
+        default: ['not-applicable']
+    }
 }, {_id: false});
 
 // Schéma pour les types de problèmes
@@ -105,24 +118,31 @@ const ProblemTypeDescriptionSchema = new Schema({
     description: {
         type: String,
         required: true,
-        maxlength: 4096
+        maxlength: 4096,
+        default: 'Description du problème non disponible'
     },
     cweId: {
         type: String,
-        match: [/^CWE-[1-9][0-9]*$/, 'Format CWE-ID invalide']
+        match: [/^CWE-[1-9][0-9]*$/, 'Format CWE-ID invalide'],
+        default: 'CWE-0'
     },
     type: {
         type: String,
-        maxlength: 128
+        maxlength: 128,
+        default: 'CWE'
     },
-    references: [ReferenceSchema]
+    references: {
+        type: [ReferenceSchema],
+        default: []
+    }
 }, {_id: false});
 
 const ProblemTypeSchema = new Schema({
     descriptions: {
         type: [ProblemTypeDescriptionSchema],
         required: true,
-        validate: [arr => arr.length > 0, 'Au moins une description de problème est requise']
+        validate: [arr => arr.length > 0, 'Au moins une description de problème est requise'],
+        default: [{ lang: 'en', description: 'Description du problème non disponible', type: 'CWE', cweId: 'CWE-0' }]
     }
 }, {_id: false});
 
@@ -131,7 +151,8 @@ const CvssV31Schema = new Schema({
     version: {
         type: String,
         enum: ['3.1'],
-        required: true
+        required: true,
+        default: '3.1'
     },
     vectorString: {
         type: String,
@@ -139,73 +160,89 @@ const CvssV31Schema = new Schema({
         match: [
             /^CVSS:3[.]1\/((AV:[NALP]|AC:[LH]|PR:[NLH]|UI:[NR]|S:[UC]|[CIA]:[NLH]|E:[XUPFH]|RL:[XOTWU]|RC:[XURC]|[CIA]R:[XLMH]|MAV:[XNALP]|MAC:[XLH]|MPR:[XNLH]|MUI:[XNR]|MS:[XUC]|M[CIA]:[XNLH])\/)*?(AV:[NALP]|AC:[LH]|PR:[NLH]|UI:[NR]|S:[UC]|[CIA]:[NLH]|E:[XUPFH]|RL:[XOTWU]|RC:[XURC]|[CIA]R:[XLMH]|MAV:[XNALP]|MAC:[XLH]|MPR:[XNLH]|MUI:[XNR]|MS:[XUC]|M[CIA]:[XNLH])$/,
             'Format de vecteur CVSS 3.1 invalide'
-        ]
+        ],
+        default: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N'
     },
     baseScore: {
         type: Number,
         required: true,
         min: 0,
-        max: 10
+        max: 10,
+        default: 0
     },
     baseSeverity: {
         type: String,
         required: true,
-        enum: ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+        enum: ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+        default: 'NONE'
     },
-    // Paramètres de base
+    // Paramètres de base avec valeurs par défaut
     attackVector: {
         type: String,
-        enum: ['NETWORK', 'ADJACENT_NETWORK', 'LOCAL', 'PHYSICAL']
+        enum: ['NETWORK', 'ADJACENT_NETWORK', 'LOCAL', 'PHYSICAL'],
+        default: 'NETWORK'
     },
     attackComplexity: {
         type: String,
-        enum: ['HIGH', 'LOW']
+        enum: ['HIGH', 'LOW'],
+        default: 'LOW'
     },
     privilegesRequired: {
         type: String,
-        enum: ['HIGH', 'LOW', 'NONE']
+        enum: ['HIGH', 'LOW', 'NONE'],
+        default: 'NONE'
     },
     userInteraction: {
         type: String,
-        enum: ['NONE', 'REQUIRED']
+        enum: ['NONE', 'REQUIRED'],
+        default: 'NONE'
     },
     scope: {
         type: String,
-        enum: ['UNCHANGED', 'CHANGED']
+        enum: ['UNCHANGED', 'CHANGED'],
+        default: 'UNCHANGED'
     },
     confidentialityImpact: {
         type: String,
-        enum: ['NONE', 'LOW', 'HIGH']
+        enum: ['NONE', 'LOW', 'HIGH'],
+        default: 'NONE'
     },
     integrityImpact: {
         type: String,
-        enum: ['NONE', 'LOW', 'HIGH']
+        enum: ['NONE', 'LOW', 'HIGH'],
+        default: 'NONE'
     },
     availabilityImpact: {
         type: String,
-        enum: ['NONE', 'LOW', 'HIGH']
+        enum: ['NONE', 'LOW', 'HIGH'],
+        default: 'NONE'
     },
     // Métriques temporelles (optionnelles)
     exploitCodeMaturity: {
         type: String,
-        enum: ['UNPROVEN', 'PROOF_OF_CONCEPT', 'FUNCTIONAL', 'HIGH', 'NOT_DEFINED']
+        enum: ['UNPROVEN', 'PROOF_OF_CONCEPT', 'FUNCTIONAL', 'HIGH', 'NOT_DEFINED'],
+        default: 'NOT_DEFINED'
     },
     remediationLevel: {
         type: String,
-        enum: ['OFFICIAL_FIX', 'TEMPORARY_FIX', 'WORKAROUND', 'UNAVAILABLE', 'NOT_DEFINED']
+        enum: ['OFFICIAL_FIX', 'TEMPORARY_FIX', 'WORKAROUND', 'UNAVAILABLE', 'NOT_DEFINED'],
+        default: 'NOT_DEFINED'
     },
     reportConfidence: {
         type: String,
-        enum: ['UNKNOWN', 'REASONABLE', 'CONFIRMED', 'NOT_DEFINED']
+        enum: ['UNKNOWN', 'REASONABLE', 'CONFIRMED', 'NOT_DEFINED'],
+        default: 'NOT_DEFINED'
     },
     temporalScore: {
         type: Number,
         min: 0,
-        max: 10
+        max: 10,
+        default: 0
     },
     temporalSeverity: {
         type: String,
-        enum: ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+        enum: ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+        default: 'NONE'
     }
 }, {_id: false});
 
@@ -214,14 +251,19 @@ const CvssV20Schema = new Schema({
     version: {
         type: String,
         enum: ['2.0'],
-        required: true
+        required: true,
+        default: '2.0'
     },
-    vectorString: String,
+    vectorString: {
+        type: String,
+        default: 'AV:N/AC:L/Au:N/C:N/I:N/A:N'
+    },
     baseScore: {
         type: Number,
         required: true,
         min: 0,
-        max: 10
+        max: 10,
+        default: 0
     },
     // Autres propriétés CVSS 2.0...
 }, {_id: false, strict: false});
@@ -230,19 +272,25 @@ const CvssV30Schema = new Schema({
     version: {
         type: String,
         enum: ['3.0'],
-        required: true
+        required: true,
+        default: '3.0'
     },
-    vectorString: String,
+    vectorString: {
+        type: String,
+        default: 'CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N'
+    },
     baseScore: {
         type: Number,
         required: true,
         min: 0,
-        max: 10
+        max: 10,
+        default: 0
     },
     baseSeverity: {
         type: String,
         required: true,
-        enum: ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+        enum: ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+        default: 'NONE'
     },
     // Autres propriétés CVSS 3.0...
 }, {_id: false, strict: false});
@@ -251,19 +299,25 @@ const CvssV40Schema = new Schema({
     version: {
         type: String,
         enum: ['4.0'],
-        required: true
+        required: true,
+        default: '4.0'
     },
-    vectorString: String,
+    vectorString: {
+        type: String,
+        default: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N'
+    },
     baseScore: {
         type: Number,
         required: true,
         min: 0,
-        max: 10
+        max: 10,
+        default: 0
     },
     baseSeverity: {
         type: String,
         required: true,
-        enum: ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+        enum: ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+        default: 'NONE'
     },
     // Autres propriétés CVSS 4.0...
 }, {_id: false, strict: false});
@@ -272,16 +326,20 @@ const CvssV40Schema = new Schema({
 const MetricSchema = new Schema({
     format: {
         type: String,
-        enum: ['CVSS']
+        enum: ['CVSS'],
+        default: 'CVSS'
     },
-    scenarios: [{
-        lang: LanguageSchema,
-        value: {
-            type: String,
-            default: 'GENERAL',
-            maxlength: 4096
-        }
-    }],
+    scenarios: {
+        type: [{
+            lang: LanguageSchema,
+            value: {
+                type: String,
+                default: 'GENERAL',
+                maxlength: 4096
+            }
+        }],
+        default: [{ lang: 'en', value: 'GENERAL' }]
+    },
     cvssV2_0: CvssV20Schema,
     cvssV3_0: CvssV30Schema,
     cvssV3_1: CvssV31Schema,
@@ -289,10 +347,12 @@ const MetricSchema = new Schema({
     other: {
         type: {
             type: String,
-            maxlength: 128
+            maxlength: 128,
+            default: ''
         },
         content: {
             type: Schema.Types.Mixed,
+            default: {}
         }
     }
 }, {_id: false});
@@ -302,85 +362,116 @@ const VersionRangeSchema = new Schema({
     version: {
         type: String,
         required: true,
-        maxlength: 1024
+        maxlength: 1024,
+        default: 'n/a'
     },
     status: {
         type: String,
         required: true,
-        enum: ['affected', 'unaffected', 'unknown']
+        enum: ['affected', 'unaffected', 'unknown'],
+        default: 'unknown'
     },
     versionType: {
         type: String,
-        maxlength: 128
+        maxlength: 128,
+        default: 'custom'
     },
     lessThan: {
         type: String,
-        maxlength: 1024
+        maxlength: 1024,
+        default: ''
     },
     lessThanOrEqual: {
         type: String,
-        maxlength: 1024
+        maxlength: 1024,
+        default: ''
     },
-    changes: [{
-        at: {
-            type: String,
-            required: true,
-            maxlength: 1024
-        },
-        status: {
-            type: String,
-            required: true,
-            enum: ['affected', 'unaffected', 'unknown']
-        }
-    }]
+    changes: {
+        type: [{
+            at: {
+                type: String,
+                required: true,
+                maxlength: 1024,
+                default: 'n/a'
+            },
+            status: {
+                type: String,
+                required: true,
+                enum: ['affected', 'unaffected', 'unknown'],
+                default: 'unknown'
+            }
+        }],
+        default: []
+    }
 }, {_id: false});
 
 // Schéma pour les produits affectés
 const ProductSchema = new Schema({
     vendor: {
         type: String,
-        maxlength: 512
+        maxlength: 512,
+        default: 'Non spécifié'
     },
     product: {
         type: String,
-        maxlength: 2048
+        maxlength: 2048,
+        default: 'Non spécifié'
     },
     collectionURL: UriSchema,
     packageName: {
         type: String,
-        maxlength: 2048
+        maxlength: 2048,
+        default: ''
     },
-    cpes: [{
-        type: String,
-
-        maxlength: 2048
-    }],
-    modules: [{
-        type: String,
-        maxlength: 4096
-    }],
-    programFiles: [{
-        type: String,
-        maxlength: 1024
-    }],
-    programRoutines: [{
-        name: {
+    cpes: {
+        type: [{
             type: String,
-            required: true,
+            maxlength: 2048
+        }],
+        default: []
+    },
+    modules: {
+        type: [{
+            type: String,
             maxlength: 4096
-        }
-    }],
-    platforms: [{
-        type: String,
-        maxlength: 1024
-    }],
+        }],
+        default: []
+    },
+    programFiles: {
+        type: [{
+            type: String,
+            maxlength: 1024
+        }],
+        default: []
+    },
+    programRoutines: {
+        type: [{
+            name: {
+                type: String,
+                required: true,
+                maxlength: 4096,
+                default: 'Unknown'
+            }
+        }],
+        default: []
+    },
+    platforms: {
+        type: [{
+            type: String,
+            maxlength: 1024
+        }],
+        default: []
+    },
     repo: UriSchema,
     defaultStatus: {
         type: String,
         enum: ['affected', 'unaffected', 'unknown'],
         default: 'unknown'
     },
-    versions: [VersionRangeSchema]
+    versions: {
+        type: [VersionRangeSchema],
+        default: []
+    }
 }, {_id: false});
 
 // Schéma pour les crédits
@@ -389,7 +480,8 @@ const CreditSchema = new Schema({
     value: {
         type: String,
         required: true,
-        maxlength: 4096
+        maxlength: 4096,
+        default: 'Anonyme'
     },
     user: UuidSchema,
     type: {
@@ -421,7 +513,8 @@ const TimelineSchema = new Schema({
     value: {
         type: String,
         required: true,
-        maxlength: 4096
+        maxlength: 4096,
+        default: 'Événement non spécifié'
     }
 }, {_id: false});
 
@@ -433,7 +526,8 @@ const ProviderMetadataSchema = new Schema({
     shortName: {
         type: String,
         minlength: 2,
-        maxlength: 32
+        maxlength: 32,
+        default: 'Unknown'
     },
     dateUpdated: TimestampSchema
 }, {_id: false});
@@ -442,96 +536,191 @@ const ProviderMetadataSchema = new Schema({
 const CnaContainerSchema = new Schema({
     providerMetadata: {
         type: ProviderMetadataSchema,
-        required: true
+        required: true,
+        default: () => ({
+            orgId: '00000000-0000-4000-a000-000000000000',
+            shortName: 'Unknown',
+            dateUpdated: new Date().toISOString()
+        })
     },
     dateAssigned: TimestampSchema,
     datePublic: TimestampSchema,
     title: {
         type: String,
-        maxlength: 256
+        maxlength: 256,
+        default: 'CVE sans titre'
     },
     descriptions: {
         type: [DescriptionSchema],
         required: true,
-        validate: [arr => arr.length > 0, 'Au moins une description est requise']
+        validate: [arr => arr.length > 0, 'Au moins une description est requise'],
+        default: [{ lang: 'en', value: 'Description non disponible' }]
     },
     affected: {
         type: [ProductSchema],
         required: true,
-        validate: [arr => arr.length > 0, 'Au moins un produit affecté est requis']
+        validate: [arr => arr.length > 0, 'Au moins un produit affecté est requis'],
+        default: [{ vendor: 'Non spécifié', product: 'Non spécifié' }]
     },
-    problemTypes: [ProblemTypeSchema],
+    problemTypes: {
+        type: [ProblemTypeSchema],
+        default: []
+    },
     references: {
         type: [ReferenceSchema],
         required: true,
-        validate: [arr => arr.length > 0, 'Au moins une référence est requise']
+        validate: [arr => arr.length > 0, 'Au moins une référence est requise'],
+        default: [{ url: 'https://example.com', name: 'Référence par défaut' }]
     },
-    impacts: [{
-        capecId: {
-            type: String,
-            match: [/^CAPEC-[1-9][0-9]{0,4}$/, 'Format CAPEC-ID invalide']
-        },
-        descriptions: [DescriptionSchema]
-    }],
-    metrics: [MetricSchema],
-    configurations: [DescriptionSchema],
-    workarounds: [DescriptionSchema],
-    solutions: [DescriptionSchema],
-    exploits: [DescriptionSchema],
-    timeline: [TimelineSchema],
-    credits: [CreditSchema],
+    impacts: {
+        type: [{
+            capecId: {
+                type: String,
+                match: [/^CAPEC-[1-9][0-9]{0,4}$/, 'Format CAPEC-ID invalide'],
+                default: 'CAPEC-1'
+            },
+            descriptions: {
+                type: [DescriptionSchema],
+                default: []
+            }
+        }],
+        default: []
+    },
+    metrics: {
+        type: [MetricSchema],
+        default: []
+    },
+    configurations: {
+        type: [DescriptionSchema],
+        default: []
+    },
+    workarounds: {
+        type: [DescriptionSchema],
+        default: []
+    },
+    solutions: {
+        type: [DescriptionSchema],
+        default: []
+    },
+    exploits: {
+        type: [DescriptionSchema],
+        default: []
+    },
+    timeline: {
+        type: [TimelineSchema],
+        default: []
+    },
+    credits: {
+        type: [CreditSchema],
+        default: []
+    },
     source: {
-        type: Schema.Types.Mixed
+        type: Schema.Types.Mixed,
+        default: { discovery: 'UNKNOWN' }
     },
-    tags: [{
-        type: String,
-        enum: ['unsupported-when-assigned', 'exclusively-hosted-service', 'disputed']
-    }]
+    tags: {
+        type: [{
+            type: String,
+            enum: ['unsupported-when-assigned', 'exclusively-hosted-service', 'disputed']
+        }],
+        default: []
+    }
 }, {_id: false, strict: false});
 
 // Schéma pour les conteneurs ADP
 const AdpContainerSchema = new Schema({
     providerMetadata: {
         type: ProviderMetadataSchema,
-        required: true
+        required: true,
+        default: () => ({
+            orgId: '00000000-0000-4000-a000-000000000000',
+            shortName: 'Unknown',
+            dateUpdated: new Date().toISOString()
+        })
     },
     datePublic: TimestampSchema,
     title: {
         type: String,
-        maxlength: 256
+        maxlength: 256,
+        default: ''
     },
-    descriptions: [DescriptionSchema],
-    affected: [ProductSchema],
-    problemTypes: [ProblemTypeSchema],
-    references: [ReferenceSchema],
-    impacts: [{
-        capecId: {
-            type: String,
-            match: [/^CAPEC-[1-9][0-9]{0,4}$/, 'Format CAPEC-ID invalide']
-        },
-        descriptions: [DescriptionSchema]
-    }],
-    metrics: [MetricSchema],
-    configurations: [DescriptionSchema],
-    workarounds: [DescriptionSchema],
-    solutions: [DescriptionSchema],
-    exploits: [DescriptionSchema],
-    timeline: [TimelineSchema],
-    credits: [CreditSchema],
+    descriptions: {
+        type: [DescriptionSchema],
+        default: []
+    },
+    affected: {
+        type: [ProductSchema],
+        default: []
+    },
+    problemTypes: {
+        type: [ProblemTypeSchema],
+        default: []
+    },
+    references: {
+        type: [ReferenceSchema],
+        default: []
+    },
+    impacts: {
+        type: [{
+            capecId: {
+                type: String,
+                match: [/^CAPEC-[1-9][0-9]{0,4}$/, 'Format CAPEC-ID invalide'],
+                default: 'CAPEC-1'
+            },
+            descriptions: {
+                type: [DescriptionSchema],
+                default: []
+            }
+        }],
+        default: []
+    },
+    metrics: {
+        type: [MetricSchema],
+        default: []
+    },
+    configurations: {
+        type: [DescriptionSchema],
+        default: []
+    },
+    workarounds: {
+        type: [DescriptionSchema],
+        default: []
+    },
+    solutions: {
+        type: [DescriptionSchema],
+        default: []
+    },
+    exploits: {
+        type: [DescriptionSchema],
+        default: []
+    },
+    timeline: {
+        type: [TimelineSchema],
+        default: []
+    },
+    credits: {
+        type: [CreditSchema],
+        default: []
+    },
     source: {
-        type: Schema.Types.Mixed
+        type: Schema.Types.Mixed,
+        default: {}
     },
-    tags: [{
-        type: String,
-        enum: ['disputed']
-    }]
+    tags: {
+        type: [{
+            type: String,
+            enum: ['disputed']
+        }],
+        default: []
+    }
 }, {_id: false, strict: false});
 
 // Schéma pour les métadonnées CVE
 const CveMetadataSchema = new Schema({
     cveId: {
         type: String,
-        match: [/^CVE-[0-9]{4}-[0-9]{4,19}$/, 'Format CVE-ID invalide']
+        match: [/^CVE-[0-9]{4}-[0-9]{4,19}$/, 'Format CVE-ID invalide'],
+        default: 'CVE-0000-0000'
     },
     assignerOrgId: {
         type: UuidSchema,
@@ -539,7 +728,8 @@ const CveMetadataSchema = new Schema({
     assignerShortName: {
         type: String,
         minlength: 2,
-        maxlength: 32
+        maxlength: 32,
+        default: 'Unknown'
     },
     requesterUserId: UuidSchema,
     dateReserved: TimestampSchema,
@@ -548,21 +738,36 @@ const CveMetadataSchema = new Schema({
     state: {
         type: String,
         required: true,
-        enum: ['PUBLISHED', 'REJECTED']
+        enum: ['PUBLISHED', 'REJECTED'],
+        default: 'PUBLISHED'
     },
     serial: {
         type: Number,
-        min: 1
+        min: 1,
+        default: 1
     }
 }, {_id: false});
 
-// Schéma pour les containers (corriger la structure ici)
+// Schéma pour les containers
 const ContainersSchema = new Schema({
     cna: {
         type: CnaContainerSchema,
-        required: true
+        required: true,
+        default: () => ({
+            providerMetadata: {
+                orgId: '00000000-0000-4000-a000-000000000000',
+                shortName: 'Unknown',
+                dateUpdated: new Date().toISOString()
+            },
+            descriptions: [{ lang: 'en', value: 'Description non disponible' }],
+            affected: [{ vendor: 'Non spécifié', product: 'Non spécifié' }],
+            references: [{ url: 'https://example.com', name: 'Référence par défaut' }]
+        })
     },
-    adp: [AdpContainerSchema]
+    adp: {
+        type: [AdpContainerSchema],
+        default: []
+    }
 }, {_id: false});
 
 // Schéma principal pour CVE
@@ -570,41 +775,51 @@ const CveSchema = new Schema({
     dataType: {
         type: String,
         required: true,
-        enum: ['CVE_RECORD']
+        enum: ['CVE_RECORD'],
+        default: 'CVE_RECORD'
     },
     dataVersion: {
         type: String,
         required: true,
         match: [/^5\.(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*))?$/, 'Format de version invalide'],
-        default: '5.1.1'
+        default: '5.1'
     },
     cveMetadata: {
         type: CveMetadataSchema,
-        required: true
+        required: true,
+        default: () => ({
+            cveId: 'CVE-0000-0000',
+            state: 'PUBLISHED',
+            dateReserved: new Date().toISOString(),
+            datePublished: new Date().toISOString(),
+            dateUpdated: new Date().toISOString()
+        })
     },
     containers: {
         type: ContainersSchema,
-        required: true
+        required: true,
+        default: () => ({})
     }
 }, {
     timestamps: true,
     collection: 'cves'
 });
 
-// Méthodes pour faciliter l'utilisation (similaires à celles définies dans votre implémentation)
+// Méthodes pour faciliter l'utilisation
 CveSchema.methods.getTitle = function () {
     if (this.containers && this.containers.cna && this.containers.cna.title) {
         return this.containers.cna.title;
     }
-    return null;
+    return 'CVE sans titre';
 };
 
 CveSchema.methods.getDescription = function (lang = 'en') {
     if (this.containers && this.containers.cna && this.containers.cna.descriptions) {
-        const desc = this.containers.cna.descriptions.find(d => d.lang.startsWith(lang));
-        return desc ? desc.value : null;
+        const desc = this.containers.cna.descriptions.find(d => d.lang === lang || d.lang.startsWith(lang));
+        return desc ? desc.value : (this.containers.cna.descriptions.length > 0 ?
+            this.containers.cna.descriptions[0].value : 'Description non disponible');
     }
-    return null;
+    return 'Description non disponible';
 };
 
 CveSchema.methods.getAffectedProducts = function () {
@@ -625,6 +840,66 @@ CveSchema.methods.getCvssScores = function () {
         });
     }
     return scores;
+};
+
+CveSchema.methods.getProblemTypes = function () {
+    if (this.containers && this.containers.cna && this.containers.cna.problemTypes) {
+        return this.containers.cna.problemTypes;
+    }
+    return [];
+};
+
+CveSchema.methods.getReferences = function () {
+    if (this.containers && this.containers.cna && this.containers.cna.references) {
+        return this.containers.cna.references;
+    }
+    return [];
+};
+
+CveSchema.methods.getHighestSeverity = function () {
+    const scores = this.getCvssScores();
+    if (scores.length === 0) return 'UNKNOWN';
+
+    const severityPriority = {
+        'CRITICAL': 5,
+        'HIGH': 4,
+        'MEDIUM': 3,
+        'LOW': 2,
+        'NONE': 1,
+        'UNKNOWN': 0
+    };
+
+    let highestSeverity = 'UNKNOWN';
+    let highestPriority = 0;
+
+    scores.forEach(score => {
+        const severity = score.baseSeverity || 'UNKNOWN';
+        const priority = severityPriority[severity] || 0;
+
+        if (priority > highestPriority) {
+            highestSeverity = severity;
+            highestPriority = priority;
+        }
+    });
+
+    return highestSeverity;
+};
+
+// Méthode statique pour rechercher par ID CVE
+CveSchema.statics.findByCveId = function(cveId) {
+    return this.findOne({ 'cveMetadata.cveId': cveId });
+};
+
+// Méthode statique pour rechercher par terme
+CveSchema.statics.search = function(term, limit = 20) {
+    const regex = new RegExp(term, 'i');
+    return this.find({
+        $or: [
+            { 'cveMetadata.cveId': regex },
+            { 'containers.cna.title': regex },
+            { 'containers.cna.descriptions.value': regex }
+        ]
+    }).limit(limit);
 };
 
 // Création du modèle
