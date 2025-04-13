@@ -1,0 +1,29 @@
+{
+  "name": "cve-parser",
+  "version": "1.0.0",
+  "description": "Parser et validateur pour les données CVE (Common Vulnerabilities and Exposures)",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node examples/example.js",
+    "simple": "node examples/simple-example.js",
+    "debug": "node --inspect examples/example.js"
+  },
+  "keywords": [
+    "cve",
+    "security",
+    "vulnerability",
+    "parser",
+    "validator"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ajv": "^8.12.0",
+    "ajv-draft-04": "^1.0.0",
+    "ajv-formats": "^2.1.1",
+    "fs-extra": "^11.1.1",
+    "mongoose": "^8.13.2"
+  }
+}
