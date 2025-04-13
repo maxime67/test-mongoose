@@ -123,7 +123,6 @@ const ProblemTypeDescriptionSchema = new Schema({
     },
     cweId: {
         type: String,
-        match: [/^CWE-[1-9][0-9]*$/, 'Format CWE-ID invalide'],
         default: 'CWE-0'
     },
     type: {
@@ -621,7 +620,6 @@ const CnaContainerSchema = new Schema({
     tags: {
         type: [{
             type: String,
-            enum: ['unsupported-when-assigned', 'exclusively-hosted-service', 'disputed']
         }],
         default: []
     }

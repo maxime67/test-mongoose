@@ -10,58 +10,77 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Connexion à MongoDB
-DB.connectDB();
+await DB.connectDB();
 
-// Lire le fichier sample-cve.json
-const sampleCvePath = path.join(__dirname, 'examples', 'sample-cve.json');
+// Définir le chemin du dossier contenant les fichiers CVE
+const cvesFolderPath = path.join(__dirname, 'examples', 'cves');
 
-try {
-    // Lire et parser le fichier JSON
-    const cveData = JSON.parse(fs.readFileSync(sampleCvePath, 'utf8'));
-    console.log('Fichier CVE lu avec succès');
+// Créer le dossier s'il n'existe pas
+if (!fs.existsSync(cvesFolderPath)) {
+    console.log(`Le dossier ${cvesFolderPath} n'existe pas, création en cours...`);
+    fs.mkdirSync(cvesFolderPath, { recursive: true });
 
-    // Insérer le CVE dans la base de données
-    cveService.insertCve(cveData)
-        .then(async result => {
-            const affectedProducts = result.getAffectedProducts();
-
-            try {
-                const savedProducts = await extractAndSaveProducts(result);
-
-                // Afficher les détails des produits sauvegardés
-                if (savedProducts.length > 0) {
-                    savedProducts.forEach(product => {
-                        console.log(`- ${product.vendor}/${product.product}`);
-
-                        // Afficher les versions
-                        if (product.versions && product.versions.length) {
-                            product.versions.forEach(version => {
-                                let versionInfo = `    * ${version.version} (${version.status})`;
-                                if (version.lessThanOrEqual) {
-                                    versionInfo += ` <= ${version.lessThanOrEqual}`;
-                                } else if (version.lessThan) {
-                                    versionInfo += ` < ${version.lessThan}`;
-                                }
-                            });
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Erreur lors de l\'extraction des produits:', error.message);
-            }
-
-        })
-        .catch(error => {
-            console.error('Erreur lors de l\'insertion du CVE:', error.message);
-        })
-        .finally(() => {
-            // Attendre un peu avant de fermer la connexion pour laisser le temps à Mongoose de terminer
-            setTimeout(() => {
-                console.log('Fermeture de la connexion à MongoDB');
-                process.exit(0);
-            }, 2000);
-        });
-} catch (error) {
-    console.error('Erreur lors de la lecture du fichier CVE:', error.message);
-    process.exit(1);
+    // Déplacer sample-cve.json dans le nouveau dossier pour avoir au moins un exemple
+    const samplePath = path.join(__dirname, 'examples', 'sample-cve.json');
+    if (fs.existsSync(samplePath)) {
+        const destinationPath = path.join(cvesFolderPath, 'sample-cve.json');
+        fs.copyFileSync(samplePath, destinationPath);
+        console.log(`Fichier exemple copié vers ${destinationPath}`);
+    }
 }
+
+// Lire tous les fichiers du dossier
+const files = fs.readdirSync(cvesFolderPath);
+const jsonFiles = files.filter(file => file.endsWith('.json'));
+
+console.log(`Nombre de fichiers JSON trouvés: ${jsonFiles.length}`);
+
+// Variable pour compter les CVE traités
+let processedCount = 0;
+let successCount = 0;
+let errorCount = 0;
+
+// Traiter chaque fichier JSON
+for (const jsonFile of jsonFiles) {
+    const filePath = path.join(cvesFolderPath, jsonFile);
+    console.log(`Traitement du fichier: ${jsonFile}`);
+
+    try {
+        // Lire et parser le fichier JSON
+        const cveData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+        // Insérer le CVE dans la base de données
+        const result = await cveService.insertCve(cveData);
+
+        // Extraire les produits affectés
+        const savedProducts = await extractAndSaveProducts(result);
+
+        // Afficher les détails des produits sauvegardés
+        if (savedProducts.length > 0) {
+            console.log(`Produits affectés pour ${jsonFile}:`);
+            savedProducts.forEach(product => {
+                console.log(`- ${product.vendor}/${product.product}`);
+            });
+        }
+
+        successCount++;
+        console.log(`Fichier ${jsonFile} traité avec succès.`);
+    } catch (error) {
+        errorCount++;
+        console.error(`Erreur lors du traitement du fichier ${jsonFile}:`, error.message);
+    }
+
+    processedCount++;
+}
+
+// Afficher un résumé
+console.log('\nRésumé du traitement:');
+console.log(`Total de fichiers traités: ${processedCount}`);
+console.log(`Succès: ${successCount}`);
+console.log(`Erreurs: ${errorCount}`);
+
+// Fermer la connexion à MongoDB après traitement
+console.log('Fermeture de la connexion à MongoDB');
+setTimeout(() => {
+    process.exit(0);
+}, 2000);
