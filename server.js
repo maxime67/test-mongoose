@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import DB from './config/db.js';
 import cveService from './services/cveService.js';
+import extractAndSaveProducts from './services/productExctactor.js';
 
 // Obtenir le chemin du répertoire actuel en mode ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -21,17 +22,34 @@ try {
 
     // Insérer le CVE dans la base de données
     cveService.insertCve(cveData)
-        .then(result => {
-            console.log('CVE inséré avec succès:', result.cveMetadata.cveId);
-            console.log('Titre:', result.getTitle());
-            console.log('Description:', result.getDescription());
-
-            // Afficher les produits affectés
+        .then(async result => {
             const affectedProducts = result.getAffectedProducts();
-            console.log(`Nombre de produits affectés: ${affectedProducts.length}`);
-            affectedProducts.forEach(product => {
-                console.log(product)
-            });
+
+            try {
+                const savedProducts = await extractAndSaveProducts(result);
+
+                // Afficher les détails des produits sauvegardés
+                if (savedProducts.length > 0) {
+                    savedProducts.forEach(product => {
+                        console.log(`- ${product.vendor}/${product.product}`);
+
+                        // Afficher les versions
+                        if (product.versions && product.versions.length) {
+                            product.versions.forEach(version => {
+                                let versionInfo = `    * ${version.version} (${version.status})`;
+                                if (version.lessThanOrEqual) {
+                                    versionInfo += ` <= ${version.lessThanOrEqual}`;
+                                } else if (version.lessThan) {
+                                    versionInfo += ` < ${version.lessThan}`;
+                                }
+                            });
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Erreur lors de l\'extraction des produits:', error.message);
+            }
+
         })
         .catch(error => {
             console.error('Erreur lors de l\'insertion du CVE:', error.message);
