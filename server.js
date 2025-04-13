@@ -4,10 +4,21 @@ import { fileURLToPath } from 'url';
 import DB from './config/db.js';
 import cveService from './services/cveService.js';
 import extractAndSaveProducts from './services/productExctactor.js';
+import gitSyncService from './services/gitSyncService.js';
 
 // Obtenir le chemin du répertoire actuel en mode ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Synchroniser les fichiers CVE depuis le dépôt GitHub
+console.log('Synchronisation des CVE depuis GitHub...');
+try {
+    await gitSyncService.sync();
+    console.log('Synchronisation des CVE terminée.');
+} catch (error) {
+    console.error('Erreur lors de la synchronisation des CVE:', error.message);
+    console.log('Continuation du processus avec les fichiers existants...');
+}
 
 // Connexion à MongoDB
 await DB.connectDB();
@@ -78,6 +89,13 @@ console.log('\nRésumé du traitement:');
 console.log(`Total de fichiers traités: ${processedCount}`);
 console.log(`Succès: ${successCount}`);
 console.log(`Erreurs: ${errorCount}`);
+
+// Nettoyage des ressources temporaires
+try {
+    await gitSyncService.cleanup();
+} catch (error) {
+    console.error('Erreur lors du nettoyage des ressources temporaires:', error.message);
+}
 
 // Fermer la connexion à MongoDB après traitement
 console.log('Fermeture de la connexion à MongoDB');
