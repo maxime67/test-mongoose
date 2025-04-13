@@ -25,10 +25,13 @@ const extractAndSaveProducts = async (cveDocument) => {
 
                 try {
                     // Utiliser la méthode findOrCreate pour insérer ou mettre à jour le produit
+                    // et ajouter directement la référence au CVE
                     const product = await Product.findOrCreate(affectedProduct);
 
-                    // Ajouter une référence au CVE dans le produit
-                    await product.addCveReference(cveDocument._id);
+                    // Ajouter une référence au CVE dans le produit en utilisant la méthode corrigée
+                    if (product && cveDocument._id) {
+                        await product.addCveReference(cveDocument._id);
+                    }
 
                     results.push(product);
                 } catch (error) {

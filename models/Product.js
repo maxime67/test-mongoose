@@ -115,125 +115,170 @@ const ProductSchema = new Schema({
 // Index composé sur vendor et product pour recherche rapide
 ProductSchema.index({ vendor: 1, product: 1 }, { unique: true });
 
-// Méthodes utilitaires
+// Méthodes utilitaires - Version corrigée pour éviter les erreurs de version
 ProductSchema.statics.findOrCreate = async function(productData) {
-    // Chercher le produit par vendor et product
-    let product = await this.findOne({
-        vendor: productData.vendor,
-        product: productData.product
-    });
+    try {
+        // Utiliser findOneAndUpdate avec upsert: true pour une opération atomique
+        // Ce qui évite les problèmes de version de document
+        const query = {
+            vendor: productData.vendor,
+            product: productData.product
+        };
 
-    if (!product) {
-        // Si le produit n'existe pas, le créer
-        product = new this(productData);
-        console.log(product)
-        await product.save();
-    } else {
-        // Si le produit existe, mettre à jour ses propriétés
+        // Construire l'objet de mise à jour
+        const updateObj = {};
 
-        // Mise à jour des champs simples s'ils sont fournis et non vides
-        if (productData.collectionURL) product.collectionURL = productData.collectionURL;
-        if (productData.packageName) product.packageName = productData.packageName;
-        if (productData.repo) product.repo = productData.repo;
-        if (productData.defaultStatus) product.defaultStatus = productData.defaultStatus;
+        // Ajout des champs simples s'ils sont fournis
+        if (productData.collectionURL) updateObj.collectionURL = productData.collectionURL;
+        if (productData.packageName) updateObj.packageName = productData.packageName;
+        if (productData.repo) updateObj.repo = productData.repo;
+        if (productData.defaultStatus) updateObj.defaultStatus = productData.defaultStatus;
 
-        // Mise à jour des tableaux (ajout des éléments uniques seulement)
-        if (productData.cpes && productData.cpes.length) {
-            productData.cpes.forEach(cpe => {
-                if (!product.cpes.includes(cpe)) {
-                    product.cpes.push(cpe);
-                }
-            });
-        }
+        // Pour un nouvel enregistrement, définir les champs obligatoires
+        const setObj = {
+            ...updateObj,
+            vendor: productData.vendor,
+            product: productData.product
+        };
 
-        if (productData.modules && productData.modules.length) {
-            productData.modules.forEach(module => {
-                if (!product.modules.includes(module)) {
-                    product.modules.push(module);
-                }
-            });
-        }
+        // Paramètres pour l'opération d'upsert
+        const options = {
+            new: true,           // Retourne le document mis à jour plutôt que l'original
+            upsert: true,        // Crée le document s'il n'existe pas
+            runValidators: true  // Exécute les validateurs du schéma
+        };
 
-        if (productData.programFiles && productData.programFiles.length) {
-            productData.programFiles.forEach(file => {
-                if (!product.programFiles.includes(file)) {
-                    product.programFiles.push(file);
-                }
-            });
-        }
+        // Effectuer l'opération findOneAndUpdate avec upsert
+        let product = await this.findOneAndUpdate(query, { $set: setObj }, options);
 
-        if (productData.platforms && productData.platforms.length) {
-            productData.platforms.forEach(platform => {
-                if (!product.platforms.includes(platform)) {
-                    product.platforms.push(platform);
-                }
-            });
-        }
+        // Mise à jour des tableaux si le produit existe
+        if (product) {
+            const arrayUpdates = {};
 
-        // Gestion des versions (plus complexe car c'est un sous-document)
-        if (productData.versions && productData.versions.length) {
-            productData.versions.forEach(newVersion => {
-                // Chercher si cette version existe déjà
-                const existingVersionIndex = product.versions.findIndex(v =>
-                    v.version === newVersion.version);
+            // Préparer les mises à jour de type $addToSet pour les tableaux
+            if (productData.cpes && productData.cpes.length) {
+                arrayUpdates.$addToSet = arrayUpdates.$addToSet || {};
+                arrayUpdates.$addToSet.cpes = { $each: productData.cpes };
+            }
 
-                if (existingVersionIndex === -1) {
-                    // Si la version n'existe pas, l'ajouter
-                    product.versions.push(newVersion);
-                } else {
-                    // Si la version existe, mettre à jour ses propriétés
-                    const existingVersion = product.versions[existingVersionIndex];
+            if (productData.modules && productData.modules.length) {
+                arrayUpdates.$addToSet = arrayUpdates.$addToSet || {};
+                arrayUpdates.$addToSet.modules = { $each: productData.modules };
+            }
 
-                    if (newVersion.status) existingVersion.status = newVersion.status;
-                    if (newVersion.versionType) existingVersion.versionType = newVersion.versionType;
-                    if (newVersion.lessThan) existingVersion.lessThan = newVersion.lessThan;
-                    if (newVersion.lessThanOrEqual) existingVersion.lessThanOrEqual = newVersion.lessThanOrEqual;
+            if (productData.programFiles && productData.programFiles.length) {
+                arrayUpdates.$addToSet = arrayUpdates.$addToSet || {};
+                arrayUpdates.$addToSet.programFiles = { $each: productData.programFiles };
+            }
 
-                    // Mise à jour des changements
-                    if (newVersion.changes && newVersion.changes.length) {
-                        newVersion.changes.forEach(newChange => {
-                            const existingChangeIndex = existingVersion.changes.findIndex(c =>
-                                c.at === newChange.at);
+            if (productData.platforms && productData.platforms.length) {
+                arrayUpdates.$addToSet = arrayUpdates.$addToSet || {};
+                arrayUpdates.$addToSet.platforms = { $each: productData.platforms };
+            }
 
-                            if (existingChangeIndex === -1) {
-                                existingVersion.changes.push(newChange);
-                            } else {
-                                existingVersion.changes[existingChangeIndex].status = newChange.status;
+            if (productData.programRoutines && productData.programRoutines.length) {
+                arrayUpdates.$addToSet = arrayUpdates.$addToSet || {};
+                arrayUpdates.$addToSet.programRoutines = { $each: productData.programRoutines };
+            }
+
+            // Effectuer les mises à jour des tableaux si nécessaire
+            if (Object.keys(arrayUpdates).length > 0) {
+                product = await this.findByIdAndUpdate(product._id, arrayUpdates, { new: true });
+            }
+
+            // Gestion des versions (plus complexe car c'est un sous-document)
+            if (productData.versions && productData.versions.length) {
+                // Pour chaque version fournie
+                for (const newVersion of productData.versions) {
+                    // Vérifier si cette version existe déjà
+                    const existingVersion = product.versions.find(v => v.version === newVersion.version);
+
+                    if (!existingVersion) {
+                        // Si la version n'existe pas, l'ajouter avec une opération atomique
+                        await this.findByIdAndUpdate(
+                            product._id,
+                            { $push: { versions: newVersion } },
+                            { new: true }
+                        );
+                    } else {
+                        // Si la version existe, préparer une mise à jour complexe
+                        const versionUpdate = {};
+
+                        // Mettre à jour les champs de la version existante
+                        if (newVersion.status) versionUpdate[`versions.$.status`] = newVersion.status;
+                        if (newVersion.versionType) versionUpdate[`versions.$.versionType`] = newVersion.versionType;
+                        if (newVersion.lessThan) versionUpdate[`versions.$.lessThan`] = newVersion.lessThan;
+                        if (newVersion.lessThanOrEqual) versionUpdate[`versions.$.lessThanOrEqual`] = newVersion.lessThanOrEqual;
+
+                        // Mettre à jour la version si nécessaire
+                        if (Object.keys(versionUpdate).length > 0) {
+                            await this.findOneAndUpdate(
+                                { _id: product._id, "versions.version": newVersion.version },
+                                { $set: versionUpdate },
+                                { new: true }
+                            );
+                        }
+
+                        // Gestion des changements si présents
+                        if (newVersion.changes && newVersion.changes.length) {
+                            for (const newChange of newVersion.changes) {
+                                // Vérifier si ce changement existe déjà
+                                const existingChangeIndex = product.versions
+                                    .find(v => v.version === newVersion.version)
+                                    ?.changes.findIndex(c => c.at === newChange.at);
+
+                                if (existingChangeIndex === -1 || existingChangeIndex === undefined) {
+                                    // Si le changement n'existe pas, l'ajouter
+                                    await this.findOneAndUpdate(
+                                        { _id: product._id, "versions.version": newVersion.version },
+                                        { $push: { "versions.$.changes": newChange } },
+                                        { new: true }
+                                    );
+                                } else {
+                                    // Si le changement existe, mettre à jour son statut
+                                    // Cette opération est plus complexe et nécessite une mise à jour avec arrayFilters
+                                    await this.findOneAndUpdate(
+                                        { _id: product._id },
+                                        {
+                                            $set: {
+                                                "versions.$[ver].changes.$[chg].status": newChange.status
+                                            }
+                                        },
+                                        {
+                                            arrayFilters: [
+                                                { "ver.version": newVersion.version },
+                                                { "chg.at": newChange.at }
+                                            ],
+                                            new: true
+                                        }
+                                    );
+                                }
                             }
-                        });
+                        }
                     }
-
-                    // Mettre à jour la version dans le tableau
-                    product.versions[existingVersionIndex] = existingVersion;
                 }
-            });
+            }
+
+            // Récupérer le produit mis à jour final
+            product = await this.findById(product._id);
         }
 
-        // Mise à jour des routines de programme
-        if (productData.programRoutines && productData.programRoutines.length) {
-            productData.programRoutines.forEach(newRoutine => {
-                const existingRoutineIndex = product.programRoutines.findIndex(r =>
-                    r.name === newRoutine.name);
-
-                if (existingRoutineIndex === -1) {
-                    product.programRoutines.push(newRoutine);
-                }
-                // Si la routine existe déjà, on ne fait rien
-            });
-        }
-
-        // Sauvegarder les modifications
-        await product.save();
+        return product;
+    } catch (error) {
+        console.error(`Erreur dans findOrCreate pour ${productData.vendor}/${productData.product}:`, error);
+        throw error;
     }
-
-    return product;
 };
 
-// Méthode pour ajouter une référence à un CVE
+// Méthode pour ajouter une référence à un CVE - Version corrigée utilisant une opération atomique
 ProductSchema.methods.addCveReference = async function(cveId) {
     if (!this.cves.includes(cveId)) {
-        this.cves.push(cveId);
-        await this.save();
+        // Utiliser findByIdAndUpdate avec $addToSet pour éviter les doublons et les problèmes de version
+        return await this.constructor.findByIdAndUpdate(
+            this._id,
+            { $addToSet: { cves: cveId } },
+            { new: true }
+        );
     }
     return this;
 };
