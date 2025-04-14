@@ -32,10 +32,6 @@ const LanguageSchema = {
 
 const UriSchema = {
     type: String,
-    match: [
-        /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i,
-        'URI invalide'
-    ],
     maxlength: 2048,
     default: 'https://example.com'
 };
@@ -86,27 +82,6 @@ const ReferenceSchema = new Schema({
     tags: {
         type: [{
             type: String,
-            enum: [
-                'broken-link',
-                'customer-entitlement',
-                'exploit',
-                'government-resource',
-                'issue-tracking',
-                'mailing-list',
-                'mitigation',
-                'not-applicable',
-                'patch',
-                'permissions-required',
-                'media-coverage',
-                'product',
-                'related',
-                'release-notes',
-                'signature',
-                'technical-description',
-                'third-party-advisory',
-                'vendor-advisory',
-                'vdb-entry'
-            ]
         }],
         default: ['not-applicable']
     }
@@ -325,7 +300,6 @@ const CvssV40Schema = new Schema({
 const MetricSchema = new Schema({
     format: {
         type: String,
-        enum: ['CVSS'],
         default: 'CVSS'
     },
     scenarios: {

@@ -1,5 +1,5 @@
 import Cve from '../models/Cve.js';
-
+import cveFactory from "../services/cveFactory.js"
 /**
  * Service pour gérer les opérations liées aux CVE
  */
@@ -11,6 +11,9 @@ const cveService = {
      */
     async insertCve(cveData) {
         try {
+            if(cveData.cveMetadata.cveId === "CVE-2025-20169"){
+                console.log(cveData)
+            }
             // Vérifier si le CVE existe déjà
             const existingCve = await Cve.findOne({
                 'cveMetadata.cveId': cveData.cveMetadata.cveId
@@ -23,43 +26,20 @@ const cveService = {
                 return await existingCve.save();
             }
 
+
             // Créer et sauvegarder un nouveau CVE
             const newCve = new Cve(cveData);
+            console.log(cveFactory.mapData(cveData));
+            process.exit(1)
             return await newCve.save();
         } catch (error) {
             console.error('Erreur dans le service CVE:', error);
+            process.exit(1)
             throw error;
         }
     },
 
-    /**
-     * Récupère un CVE par son ID
-     * @param {String} cveId - ID du CVE à récupérer (ex: CVE-2025-32498)
-     * @returns {Promise<Object>} - Le CVE trouvé ou null
-     */
-    async getCveById(cveId) {
-        try {
-            return await Cve.findOne({ 'cveMetadata.cveId': cveId });
-        } catch (error) {
-            console.error('Erreur lors de la récupération du CVE:', error);
-            throw error;
-        }
-    },
 
-    /**
-     * Récupère tous les CVE
-     * @param {Object} filter - Filtres optionnels
-     * @param {Number} limit - Nombre max de résultats
-     * @returns {Promise<Array>} - Liste des CVE
-     */
-    async getAllCves(filter = {}, limit = 100) {
-        try {
-            return await Cve.find(filter).limit(limit);
-        } catch (error) {
-            console.error('Erreur lors de la récupération des CVE:', error);
-            throw error;
-        }
-    }
 };
 
 export default cveService;

@@ -72,7 +72,7 @@ const gitSyncService = {
     },
 
     /**
-     * Clone ou met à jour le dépôt distant
+     * Clone ou met à jour le dépôt distant de manière optimisée
      * @returns {Promise<simpleGit.SimpleGit>} Instance Git
      */
     async cloneOrUpdateRepo() {
@@ -85,20 +85,48 @@ const gitSyncService = {
             console.log('Mise à jour du dépôt existant...');
             // Aller dans le dossier du dépôt
             const repoGit = git.cwd(tempDirPath);
-            // Récupérer les dernières modifications
-            await repoGit.fetch(['--all']);
+            // Récupérer uniquement les dernières modifications du dossier spécifique
+            await repoGit.fetch(['--depth=1']);
+            await repoGit.raw(['sparse-checkout', 'set', config.sourcePath]);
             await repoGit.reset(['--hard', 'origin/main']);
-            await repoGit.pull('origin', 'main');
             return repoGit;
         } else {
-            console.log('Clonage du dépôt...');
+            console.log('Clonage du dépôt en mode sparse checkout...');
             // Supprimer le dossier s'il existe mais n'est pas un dépôt Git valide
             if (await fs.pathExists(tempDirPath)) {
                 await fs.remove(tempDirPath);
             }
-            // Cloner le dépôt
-            await git.clone(config.repoUrl, tempDirPath, ['--depth=1']);
-            return git.cwd(tempDirPath);
+
+            // Cloner le dépôt en mode sparse pour ne récupérer que le dossier nécessaire
+            await git.clone(config.repoUrl, tempDirPath, [
+                '--depth=1',               // Clonage peu profond (1 commit)
+                '--filter=blob:none',      // Ne pas télécharger les contenus de fichiers par défaut
+                '--sparse'                 // Activer le mode sparse checkout
+            ]);
+
+            // Configurer sparse-checkout pour récupérer uniquement le dossier souhaité
+            const repoGit = git.cwd(tempDirPath);
+            await repoGit.raw(['sparse-checkout', 'set', config.sourcePath]);
+            await repoGit.raw(['checkout', 'main']);
+
+            return repoGit;
+        }
+    },
+
+    /**
+     * Récupère le hash du dernier commit en utilisant les commandes raw
+     * @param {simpleGit.SimpleGit} git - Instance Git
+     * @returns {Promise<string>} Hash du dernier commit
+     */
+    async getLatestCommit(git) {
+        try {
+            // Utiliser la commande raw qui est compatible avec toutes les versions de simple-git
+            const revParseResult = await git.raw(['rev-parse', 'HEAD']);
+            return revParseResult.trim();
+        } catch (error) {
+            console.error('Erreur lors de la récupération du dernier commit:', error);
+            // Générer un ID unique temporaire pour éviter de bloquer le processus
+            return `temp-${Date.now()}`;
         }
     },
 
@@ -171,8 +199,7 @@ const gitSyncService = {
             const git = await this.cloneOrUpdateRepo();
 
             // Obtenir le dernier commit
-            const log = await git.log(['--max-count=1']);
-            const latestCommit = log.latest.hash;
+            const latestCommit = await this.getLatestCommit(git);
 
             // Vérifier si une synchronisation est nécessaire
             if (!config.forceSync && syncState.lastCommit === latestCommit) {
