@@ -69,8 +69,6 @@ export class CveFactory {
                 cve.containers.cna.providerMetadata = cve.containers.cna.providerMetadata || {};
 
                 if (data.containers.cna.providerMetadata.orgId)
-                    console.log(typeof data.containers.cna.providerMetadata.orgId)
-                    console.log(data.containers.cna.providerMetadata.orgId)
                     cve.containers.cna.providerMetadata.orgId = data.containers.cna.providerMetadata.orgId;
                 if (data.containers.cna.providerMetadata.shortName)
                     cve.containers.cna.providerMetadata.shortName = data.containers.cna.providerMetadata.shortName;
