@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import Cve from '../models/cve.js'; // Assurez-vous que le chemin d'importation est correct
+import Cve from '../models/Cve.js'; // Assurez-vous que le chemin d'importation est correct
 
 /**
  * Factory pour créer des instances du modèle Cve avec un mapping structuré
@@ -37,6 +37,7 @@ export class CveFactory {
      * @returns {mongoose.Document} Instance Cve mise à jour
      */
     static mapData(cve, data) {
+
         // Mapping des propriétés de premier niveau
         if (data.dataType) cve.dataType = data.dataType;
         if (data.dataVersion) cve.dataVersion = data.dataVersion;
@@ -68,6 +69,8 @@ export class CveFactory {
                 cve.containers.cna.providerMetadata = cve.containers.cna.providerMetadata || {};
 
                 if (data.containers.cna.providerMetadata.orgId)
+                    console.log(typeof data.containers.cna.providerMetadata.orgId)
+                    console.log(data.containers.cna.providerMetadata.orgId)
                     cve.containers.cna.providerMetadata.orgId = data.containers.cna.providerMetadata.orgId;
                 if (data.containers.cna.providerMetadata.shortName)
                     cve.containers.cna.providerMetadata.shortName = data.containers.cna.providerMetadata.shortName;

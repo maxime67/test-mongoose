@@ -28,9 +28,7 @@ const cveService = {
 
 
             // Créer et sauvegarder un nouveau CVE
-            const newCve = new Cve(cveData);
-            console.log(cveFactory.mapData(cveData));
-            process.exit(1)
+            const newCve = cveFactory.mapData(cveFactory.create(), cveData);
             return await newCve.save();
         } catch (error) {
             console.error('Erreur dans le service CVE:', error);
